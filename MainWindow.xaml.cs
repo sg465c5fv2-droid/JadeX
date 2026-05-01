@@ -93,6 +93,17 @@ namespace JadeX
                     "JadeX - Init Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
+            // Global safety net: catch any unhandled exceptions so the app
+            // logs them instead of crashing without explanation.
+            if (Application.Current != null)
+            {
+                Application.Current.DispatcherUnhandledException += (s, args) =>
+                {
+                    try { Log($"[UNHANDLED] {args.Exception.Message}", "#cc3333"); } catch { }
+                    args.Handled = true;
+                };
+            }
+
             try
             {
                 Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
