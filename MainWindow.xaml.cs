@@ -509,23 +509,25 @@ namespace JadeX
                 bool injectCallSucceeded = false;
 
                 // FIX: Wrap the entire API call in SafeApiCall to catch TypeLoadException
+                // Pass actual PID so the API targets the correct Roblox instance
+                string pid = roblox.Id.ToString();
                 await Task.Run(() =>
                 {
                     SafeApiCall(() =>
                     {
                         var apiType = typeof(SpashAPIMadium.API);
-                        var mi = apiType.GetMethod("AttachAPI", Type.EmptyTypes);
+                        var mi = apiType.GetMethod("AttachAPI", new Type[] { typeof(string) });
                         if (mi != null)
                         {
-                            mi.Invoke(null, null);
+                            mi.Invoke(null, new object[] { pid });
                             injectCallSucceeded = true;
                         }
                         else
                         {
-                            var mi2 = apiType.GetMethod("AttachAPI", new Type[] { typeof(string) });
+                            var mi2 = apiType.GetMethod("AttachAPI", Type.EmptyTypes);
                             if (mi2 != null)
                             {
-                                mi2.Invoke(null, new object[] { string.Empty });
+                                mi2.Invoke(null, null);
                                 injectCallSucceeded = true;
                             }
                         }
@@ -570,10 +572,16 @@ namespace JadeX
                     {
                         return SafeApiCall(() =>
                         {
-                            var mi = typeof(SpashAPIMadium.API).GetMethod("AttachAPI");
+                            var mi = typeof(SpashAPIMadium.API).GetMethod("AttachAPI", new Type[] { typeof(string) });
                             if (mi != null && mi.ReturnType == typeof(bool))
                             {
-                                var res = mi.Invoke(null, null);
+                                var res = mi.Invoke(null, new object[] { pid });
+                                return res is bool b && b;
+                            }
+                            var mi2 = typeof(SpashAPIMadium.API).GetMethod("AttachAPI", Type.EmptyTypes);
+                            if (mi2 != null && mi2.ReturnType == typeof(bool))
+                            {
+                                var res = mi2.Invoke(null, null);
                                 return res is bool b && b;
                             }
                             return false;
@@ -1438,6 +1446,8 @@ namespace JadeX
 
         private async void ExecuteBtn_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
             if (!_monacoReady) { Log("Editor not ready.", "#cc3333"); return; }
             if (MonacoEditor?.CoreWebView2 == null) { Log("Editor not ready.", "#cc3333"); return; }
 
@@ -1606,6 +1616,11 @@ namespace JadeX
                     SetStatus(false, "Lost attachment");
                     Log("All instances lost. Please re-inject.", "#cc3333");
                 }
+            }
+            }
+            catch (Exception ex)
+            {
+                Log($"[ERROR] Execute crashed: {ex.Message}", "#cc3333");
             }
         }
 
@@ -2132,22 +2147,29 @@ namespace JadeX
 
         private async void ExecuteOnSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (!_monacoReady) { Log("Editor not ready.", "#cc3333"); return; }
-            if (!_injected) { Log("Not injected!", "#cc3333"); return; }
-            if (_selectedInstances.Count == 0) { Log("No instances selected.", "#cc3333"); return; }
-
-            string code = "";
             try
             {
-                var raw = await MonacoEditor.CoreWebView2.ExecuteScriptAsync("GetText()");
-                code = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? "";
+                if (!_monacoReady) { Log("Editor not ready.", "#cc3333"); return; }
+                if (!_injected) { Log("Not injected!", "#cc3333"); return; }
+                if (_selectedInstances.Count == 0) { Log("No instances selected.", "#cc3333"); return; }
+
+                string code = "";
+                try
+                {
+                    var raw = await MonacoEditor.CoreWebView2.ExecuteScriptAsync("GetText()");
+                    code = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? "";
+                }
+                catch (Exception ex) { Log($"[ERROR] Failed to read editor: {ex.Message}", "#cc3333"); return; }
+
+                if (string.IsNullOrWhiteSpace(code)) { Log("Nothing to execute.", "#888888"); return; }
+
+                foreach (var inst in _selectedInstances)
+                    await ExecuteOnInstanceAsync(code, inst);
             }
-            catch (Exception ex) { Log($"[ERROR] Failed to read editor: {ex.Message}", "#cc3333"); return; }
-
-            if (string.IsNullOrWhiteSpace(code)) { Log("Nothing to execute.", "#888888"); return; }
-
-            foreach (var inst in _selectedInstances)
-                await ExecuteOnInstanceAsync(code, inst);
+            catch (Exception ex)
+            {
+                Log($"[ERROR] Execute on selected crashed: {ex.Message}", "#cc3333");
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════
