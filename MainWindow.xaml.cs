@@ -1578,22 +1578,36 @@ namespace JadeX
                 {
                     try
                     {
+                        string? errorMsg = null;
                         bool ok = await Task.Run(() =>
                         {
-                            bool success = false;
-                            SafeApiCall(() =>
+                            try
                             {
                                 SpashAPIMadium.API.ExecuteScript(code, pid.ToString());
-                                success = true;
-                            });
-                            return success;
+                                return true;
+                            }
+                            catch (TypeInitializationException ex)
+                            {
+                                errorMsg = $"API type failed to load: {ex.InnerException?.Message ?? ex.Message}";
+                                return false;
+                            }
+                            catch (TypeLoadException ex)
+                            {
+                                errorMsg = $"API type not found: {ex.Message}";
+                                return false;
+                            }
+                            catch (Exception ex)
+                            {
+                                errorMsg = ex.InnerException?.Message ?? ex.Message;
+                                return false;
+                            }
                         });
 
                         if (ok)
                             Log($"Executed on PID {pid}  ·  {code.Length} chars", "#4ec94e");
                         else
                         {
-                            Log($"[ERROR] Execute failed on PID {pid} (API error)", "#cc3333");
+                            Log($"[ERROR] Execute failed on PID {pid}: {errorMsg ?? "unknown error"}", "#cc3333");
                             failedPids.Add(pid);
                         }
                     }
@@ -1682,21 +1696,35 @@ namespace JadeX
         {
             try
             {
+                string? errorMsg = null;
                 bool ok = await Task.Run(() =>
                 {
-                    bool success = false;
-                    SafeApiCall(() =>
+                    try
                     {
                         SpashAPIMadium.API.ExecuteScript(code, info.Pid.ToString());
-                        success = true;
-                    });
-                    return success;
+                        return true;
+                    }
+                    catch (TypeInitializationException ex)
+                    {
+                        errorMsg = $"API type failed to load: {ex.InnerException?.Message ?? ex.Message}";
+                        return false;
+                    }
+                    catch (TypeLoadException ex)
+                    {
+                        errorMsg = $"API type not found: {ex.Message}";
+                        return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        errorMsg = ex.InnerException?.Message ?? ex.Message;
+                        return false;
+                    }
                 });
 
                 if (ok)
                     Log($"Executed on PID {info.Pid}  ·  {code.Length} chars", "#4ec94e");
                 else
-                    Log($"[ERROR] Execute failed on PID {info.Pid} (API error)", "#cc3333");
+                    Log($"[ERROR] Execute failed on PID {info.Pid}: {errorMsg ?? "unknown error"}", "#cc3333");
             }
             catch (Exception ex)
             {
